@@ -1426,7 +1426,7 @@ public sealed class CardsFarmer : IAsyncDisposable, IDisposable {
 	private bool ShouldIdle(uint appID) {
 		ArgumentOutOfRangeException.ThrowIfZero(appID);
 
-		if (SalesBlacklist.Contains(appID) || (ASF.GlobalConfig?.Blacklist.Contains(appID) == true) || Bot.IsBlacklistedFromIdling(appID) || (Bot.BotConfig.FarmingPreferences.HasFlag(BotConfig.EFarmingPreferences.FarmPriorityQueueOnly) && !Bot.IsPriorityIdling(appID))) {
+		if ((!Bot.BotConfig.FarmingAppIDs.IsEmpty && !Bot.BotConfig.FarmingAppIDs.Contains(appID)) || SalesBlacklist.Contains(appID) || (ASF.GlobalConfig?.Blacklist.Contains(appID) == true) || Bot.IsBlacklistedFromIdling(appID) || (Bot.BotConfig.FarmingPreferences.HasFlag(BotConfig.EFarmingPreferences.FarmPriorityQueueOnly) && !Bot.IsPriorityIdling(appID))) {
 			// We're configured to ignore this appID, so skip it
 			return false;
 		}

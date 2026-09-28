@@ -139,6 +139,9 @@ public sealed class BotConfig {
 	public static readonly ImmutableList<EFarmingOrder> DefaultFarmingOrders = [];
 
 	[PublicAPI]
+	public static readonly ImmutableHashSet<uint> DefaultFarmingAppIDs = [];
+
+	[PublicAPI]
 	public static readonly ImmutableList<uint> DefaultGamesPlayedWhileIdle = [];
 
 	[PublicAPI]
@@ -221,6 +224,12 @@ public sealed class BotConfig {
 
 	[JsonInclude]
 	public EFarmingPreferences FarmingPreferences { get; init; } = DefaultFarmingPreferences;
+
+	[JsonDisallowNull]
+	[JsonInclude]
+	[SwaggerItemsMinMax(MinimumUint = 1, MaximumUint = uint.MaxValue)]
+	[UnconditionalSuppressMessage("AssemblyLoadTrimming", "IL2026:RequiresUnreferencedCode", Justification = "This is optional, supportive attribute, we don't care if it gets trimmed or not")]
+	public ImmutableHashSet<uint> FarmingAppIDs { get; init; } = DefaultFarmingAppIDs;
 
 	[JsonDisallowNull]
 	[JsonInclude]
@@ -404,6 +413,9 @@ public sealed class BotConfig {
 	public bool ShouldSerializeFarmingPreferences() => !Saving || (FarmingPreferences != DefaultFarmingPreferences);
 
 	[UsedImplicitly]
+	public bool ShouldSerializeFarmingAppIDs() => !Saving || ((FarmingAppIDs != DefaultFarmingAppIDs) && !FarmingAppIDs.SetEquals(DefaultFarmingAppIDs));
+
+	[UsedImplicitly]
 	public bool ShouldSerializeGamesPlayedWhileIdle() => !Saving || ((GamesPlayedWhileIdle != DefaultGamesPlayedWhileIdle) && !GamesPlayedWhileIdle.SequenceEqual(DefaultGamesPlayedWhileIdle));
 
 	[UsedImplicitly]
@@ -532,6 +544,10 @@ public sealed class BotConfig {
 
 		foreach (EFarmingOrder farmingOrder in FarmingOrders.Where(static farmingOrder => !Enum.IsDefined(farmingOrder))) {
 			return (false, Strings.FormatErrorConfigPropertyInvalid(nameof(FarmingOrders), farmingOrder));
+		}
+
+		if (FarmingAppIDs.Contains(0)) {
+			return (false, Strings.FormatErrorConfigPropertyInvalid(nameof(FarmingAppIDs), 0));
 		}
 
 		if (GamesPlayedWhileIdle.Contains(0)) {
