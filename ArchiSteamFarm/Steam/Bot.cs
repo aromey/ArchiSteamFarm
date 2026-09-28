@@ -304,6 +304,9 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 	private DateTime LastLogonSessionReplaced;
 	private bool LibraryLocked;
 	private byte LoginFailures;
+	private readonly object GamesPlayedWhileIdlePromptLock = new();
+	private Task<ImmutableList<uint>>? GamesPlayedWhileIdlePromptTask;
+	private volatile ImmutableHashSet<uint>? PromptedFarmingAppIDs;
 	private ulong MasterChatGroupID;
 	private Timer? PlayingWasBlockedTimer;
 	private string? QrCodeLoginInput;
@@ -3546,6 +3549,10 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 			return;
 		}
 
+		if (BotConfig.PromptForGamesPlayedWhileIdle) {
+			await GetGamesPlayedWhileIdle().ConfigureAwait(false);
+		}
+
 		if ((GamesRedeemerInBackgroundTimer == null) && BotDatabase.HasGamesToRedeemInBackground) {
 			Utilities.InBackground(() => RedeemGamesInBackground());
 		}
@@ -3906,13 +3913,70 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 		}
 	}
 
+	internal bool IsFarmingAppIDAllowed(uint appID) => BotConfig.PromptForGamesPlayedWhileIdle ? (PromptedFarmingAppIDs?.Contains(appID) == true) : (BotConfig.FarmingAppIDs.IsEmpty || BotConfig.FarmingAppIDs.Contains(appID));
+
+	internal Task<ImmutableList<uint>> GetGamesPlayedWhileIdle() {
+		if (!BotConfig.PromptForGamesPlayedWhileIdle) {
+			return Task.FromResult(BotConfig.GamesPlayedWhileIdle);
+		}
+
+		lock (GamesPlayedWhileIdlePromptLock) {
+			return GamesPlayedWhileIdlePromptTask ??= PromptForGamesPlayedWhileIdle();
+		}
+	}
+
+	private async Task<ImmutableList<uint>> PromptForGamesPlayedWhileIdle() {
+		while (true) {
+			string prompt = FormatBotResponse(Strings.UserInputGamesPlayedWhileIdle, BotName);
+			string? input = await Logging.GetUserInput(prompt).ConfigureAwait(false);
+
+			if (string.IsNullOrEmpty(input)) {
+				PromptedFarmingAppIDs = ImmutableHashSet<uint>.Empty;
+
+				return [];
+			}
+
+			List<uint> appIDs = [];
+			HashSet<uint> uniqueAppIDs = [];
+			bool invalidInput = false;
+
+			foreach (string appIDText in input.Split(SharedInfo.ListElementSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
+				if (!uint.TryParse(appIDText, NumberStyles.None, CultureInfo.InvariantCulture, out uint appID) || (appID == 0)) {
+					invalidInput = true;
+
+					break;
+				}
+
+				if (uniqueAppIDs.Add(appID)) {
+					appIDs.Add(appID);
+				}
+			}
+
+			if (invalidInput || (appIDs.Count > ArchiHandler.MaxGamesPlayedConcurrently)) {
+				ArchiLogger.LogGenericWarning(Strings.FormatErrorIsInvalid(nameof(appIDs)));
+
+				continue;
+			}
+
+			PromptedFarmingAppIDs = uniqueAppIDs.ToImmutableHashSet();
+
+			return [.. appIDs];
+		}
+	}
+
 	private async Task ResetGamesPlayed() {
 		if (!IsConnectedAndLoggedOn || CardsFarmer.NowFarming) {
 			return;
 		}
 
-		if (!BotConfig.GamesPlayedWhileIdle.IsEmpty) {
+		ImmutableList<uint> gamesPlayedWhileIdle = await GetGamesPlayedWhileIdle().ConfigureAwait(false);
+
+		if (!gamesPlayedWhileIdle.IsEmpty) {
 			if (!IsPlayingPossible) {
+				if (BotConfig.PromptForGamesPlayedWhileIdle) {
+					ArchiLogger.LogGenericWarning(Strings.PlayingNotAvailable);
+				}
+
 				return;
 			}
 
@@ -3920,6 +3984,10 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 			await Task.Delay(2000).ConfigureAwait(false);
 
 			if (!IsConnectedAndLoggedOn || CardsFarmer.NowFarming || !IsPlayingPossible) {
+				if (BotConfig.PromptForGamesPlayedWhileIdle && !IsPlayingPossible) {
+					ArchiLogger.LogGenericWarning(Strings.PlayingNotAvailable);
+				}
+
 				return;
 			}
 
@@ -3937,10 +4005,14 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 				}
 			}
 
-			ArchiLogger.LogGenericInfo(Strings.FormatBotIdlingSelectedGames(nameof(BotConfig.GamesPlayedWhileIdle), string.Join(", ", BotConfig.GamesPlayedWhileIdle)));
+			if (!BotConfig.PromptForGamesPlayedWhileIdle) {
+				ArchiLogger.LogGenericInfo(Strings.FormatBotIdlingSelectedGames(nameof(BotConfig.GamesPlayedWhileIdle), string.Join(", ", gamesPlayedWhileIdle)));
+			} else {
+				ArchiLogger.LogGenericInfo(Strings.BotIdlingPromptedGames);
+			}
 		}
 
-		await ArchiHandler.PlayGames(BotConfig.GamesPlayedWhileIdle, BotConfig.CustomGamePlayedWhileIdle).ConfigureAwait(false);
+		await ArchiHandler.PlayGames(gamesPlayedWhileIdle, BotConfig.CustomGamePlayedWhileIdle).ConfigureAwait(false);
 	}
 
 	private void ResetPlayingWasBlockedWithTimer(object? state = null) {

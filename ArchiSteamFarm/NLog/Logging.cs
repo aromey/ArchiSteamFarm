@@ -74,6 +74,45 @@ internal static class Logging {
 		}
 	}
 
+	internal static async Task<string?> GetUserInput(string prompt) {
+		ArgumentException.ThrowIfNullOrEmpty(prompt);
+
+		if (Program.Service || (ASF.GlobalConfig?.Headless ?? GlobalConfig.DefaultHeadless)) {
+			ASF.ArchiLogger.LogGenericWarning(Strings.ErrorUserInputRunningInHeadlessMode);
+
+			return null;
+		}
+
+		await ConsoleSemaphore.WaitAsync().ConfigureAwait(false);
+
+		string? result;
+
+		try {
+			OnUserInputStart();
+
+			try {
+				ASF.ArchiLogger.LogGenericWarning(prompt);
+				Console.Write(prompt);
+				result = ConsoleReadLine();
+				ASF.ArchiLogger.LogGenericInfo(Strings.FormatInput(result?.AsMasked()));
+
+				if (!Console.IsOutputRedirected) {
+					Console.Clear();
+				}
+			} catch (Exception e) {
+				ASF.ArchiLogger.LogGenericException(e);
+
+				return null;
+			} finally {
+				OnUserInputEnd();
+			}
+		} finally {
+			ConsoleSemaphore.Release();
+		}
+
+		return !string.IsNullOrEmpty(result) ? result.Trim() : null;
+	}
+
 	internal static async Task<string?> GetUserInput(ASF.EUserInputType userInputType, string botName = SharedInfo.ASF) {
 		if ((userInputType == ASF.EUserInputType.None) || !Enum.IsDefined(userInputType)) {
 			throw new InvalidEnumArgumentException(nameof(userInputType), (int) userInputType, typeof(ASF.EUserInputType));

@@ -320,6 +320,8 @@ public sealed class CardsFarmer : IAsyncDisposable, IDisposable {
 			return;
 		}
 
+		await Bot.GetGamesPlayedWhileIdle().ConfigureAwait(false);
+
 		if (!Bot.CanReceiveSteamCards || (Bot.BotConfig.FarmingPreferences.HasFlag(BotConfig.EFarmingPreferences.FarmPriorityQueueOnly) && (Bot.BotDatabase.FarmingPriorityQueueAppIDs.Count == 0))) {
 			Bot.ArchiLogger.LogGenericInfo(Strings.NothingToIdle);
 			await Bot.OnFarmingFinished(false).ConfigureAwait(false);
@@ -1426,7 +1428,7 @@ public sealed class CardsFarmer : IAsyncDisposable, IDisposable {
 	private bool ShouldIdle(uint appID) {
 		ArgumentOutOfRangeException.ThrowIfZero(appID);
 
-		if ((!Bot.BotConfig.FarmingAppIDs.IsEmpty && !Bot.BotConfig.FarmingAppIDs.Contains(appID)) || SalesBlacklist.Contains(appID) || (ASF.GlobalConfig?.Blacklist.Contains(appID) == true) || Bot.IsBlacklistedFromIdling(appID) || (Bot.BotConfig.FarmingPreferences.HasFlag(BotConfig.EFarmingPreferences.FarmPriorityQueueOnly) && !Bot.IsPriorityIdling(appID))) {
+		if (!Bot.IsFarmingAppIDAllowed(appID) || SalesBlacklist.Contains(appID) || (ASF.GlobalConfig?.Blacklist.Contains(appID) == true) || Bot.IsBlacklistedFromIdling(appID) || (Bot.BotConfig.FarmingPreferences.HasFlag(BotConfig.EFarmingPreferences.FarmPriorityQueueOnly) && !Bot.IsPriorityIdling(appID))) {
 			// We're configured to ignore this appID, so skip it
 			return false;
 		}

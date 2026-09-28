@@ -197,6 +197,14 @@ StackTrace:
 		<value>Type Y to log in by scanning a QR code with the Steam mobile app, N to log in with credentials: </value>
 		<comment>Please note that this translation should end with space</comment>
 	</data>
+	<data name="UserInputGamesPlayedWhileIdle" xml:space="preserve">
+		<value>Enter comma-separated Steam App IDs to show as playing while ASF is idle (leave empty for none): </value>
+		<comment>App IDs entered here are used only for the current process. Please note that this translation should end with space</comment>
+	</data>
+	<data name="BotIdlingPromptedGames" xml:space="preserve">
+		<value>Reporting the selected games as playing while ASF is idle.</value>
+		<comment>This message intentionally does not include the App IDs entered at runtime</comment>
+	</data>
 	<data name="QrCodeLoginUrl" xml:space="preserve">
 		<value>Scan this QR code with the Steam mobile app (a new one will be printed if Steam refreshes it): {0}</value>
 		<comment>{0} will be replaced by the Steam QR challenge URL</comment>

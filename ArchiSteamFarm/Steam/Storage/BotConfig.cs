@@ -145,6 +145,9 @@ public sealed class BotConfig {
 	public static readonly ImmutableList<uint> DefaultGamesPlayedWhileIdle = [];
 
 	[PublicAPI]
+	public const bool DefaultPromptForGamesPlayedWhileIdle = false;
+
+	[PublicAPI]
 	public static readonly ImmutableHashSet<EAssetType> DefaultLootableTypes = [EAssetType.BoosterPack, EAssetType.FoilTradingCard, EAssetType.TradingCard];
 
 	[PublicAPI]
@@ -237,6 +240,9 @@ public sealed class BotConfig {
 	[SwaggerItemsMinMax(MinimumUint = 1, MaximumUint = uint.MaxValue)]
 	[UnconditionalSuppressMessage("AssemblyLoadTrimming", "IL2026:RequiresUnreferencedCode", Justification = "This is optional, supportive attribute, we don't care if it gets trimmed or not")]
 	public ImmutableList<uint> GamesPlayedWhileIdle { get; init; } = DefaultGamesPlayedWhileIdle;
+
+	[JsonInclude]
+	public bool PromptForGamesPlayedWhileIdle { get; init; } = DefaultPromptForGamesPlayedWhileIdle;
 
 	[JsonInclude]
 	public EGamingDeviceType GamingDeviceType { get; init; } = DefaultGamingDeviceType;
@@ -417,6 +423,9 @@ public sealed class BotConfig {
 
 	[UsedImplicitly]
 	public bool ShouldSerializeGamesPlayedWhileIdle() => !Saving || ((GamesPlayedWhileIdle != DefaultGamesPlayedWhileIdle) && !GamesPlayedWhileIdle.SequenceEqual(DefaultGamesPlayedWhileIdle));
+
+	[UsedImplicitly]
+	public bool ShouldSerializePromptForGamesPlayedWhileIdle() => !Saving || (PromptForGamesPlayedWhileIdle != DefaultPromptForGamesPlayedWhileIdle);
 
 	[UsedImplicitly]
 	public bool ShouldSerializeGamingDeviceType() => !Saving || (GamingDeviceType != DefaultGamingDeviceType);
