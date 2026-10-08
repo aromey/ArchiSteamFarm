@@ -309,7 +309,7 @@ public sealed class Actions : IAsyncDisposable, IDisposable {
 
 		await Bot.CardsFarmer.Pause(permanent).ConfigureAwait(false);
 
-		if (!permanent && !Bot.BotConfig.GamesPlayedWhileIdle.IsEmpty) {
+		if (!permanent && Bot.HasGamesPlayedWhileIdle) {
 			// We want to let family sharing users access our library, and in this case we must also stop GamesPlayedWhileIdle
 			// We add extra delay because OnFarmingStopped() also executes PlayGames()
 			// Despite of proper order on our end, Steam network might not respect it

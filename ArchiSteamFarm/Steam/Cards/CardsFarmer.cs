@@ -115,7 +115,7 @@ public sealed class CardsFarmer : IAsyncDisposable, IDisposable {
 
 			// Due to the fact that we have hours sorted, the lowest amount in each group is what we'll need for the entire group
 			// This is still simplified as ASF will farm cards instead of hours ASAP, but it should give good enough approximation (if not the exact value)
-			for (int i = 0; i < totalHoursClocked.Count; i += ArchiHandler.MaxGamesPlayedConcurrently) {
+			for (int i = 0; i < totalHoursClocked.Count; i += MaxGamesToFarmConcurrently) {
 				float hoursClocked = totalHoursClocked[i];
 
 				extraHours += hoursRequired - hoursClocked;
@@ -131,6 +131,7 @@ public sealed class CardsFarmer : IAsyncDisposable, IDisposable {
 	private readonly SemaphoreSlim FarmingInitializationSemaphore = new(1, 1);
 	private readonly ConcurrentList<Game> GamesToFarm = [];
 	private readonly Timer? IdleFarmingTimer;
+	private byte MaxGamesToFarmConcurrently = ArchiHandler.MaxGamesPlayedConcurrently;
 
 	private readonly ConcurrentDictionary<uint, DateTime> LocallyIgnoredAppIDs = new();
 
@@ -320,7 +321,8 @@ public sealed class CardsFarmer : IAsyncDisposable, IDisposable {
 			return;
 		}
 
-		await Bot.GetGamesPlayedWhileIdle().ConfigureAwait(false);
+		ImmutableList<uint> gamesPlayedWhileIdle = await Bot.GetGamesPlayedWhileIdle().ConfigureAwait(false);
+		MaxGamesToFarmConcurrently = (byte) (ArchiHandler.MaxGamesPlayedConcurrently - (Bot.BotConfig.GamesPlayedWhileFarming ? gamesPlayedWhileIdle.Count : 0));
 
 		if (!Bot.CanReceiveSteamCards || (Bot.BotConfig.FarmingPreferences.HasFlag(BotConfig.EFarmingPreferences.FarmPriorityQueueOnly) && (Bot.BotDatabase.FarmingPriorityQueueAppIDs.Count == 0))) {
 			Bot.ArchiLogger.LogGenericInfo(Strings.NothingToIdle);
@@ -833,7 +835,7 @@ public sealed class CardsFarmer : IAsyncDisposable, IDisposable {
 						innerGamesToFarm.Add(game);
 
 						// There is no need to check all games at once, allow maximum of MaxGamesPlayedConcurrently in this batch
-						if (innerGamesToFarm.Count >= ArchiHandler.MaxGamesPlayedConcurrently) {
+						if (innerGamesToFarm.Count >= MaxGamesToFarmConcurrently) {
 							break;
 						}
 					}

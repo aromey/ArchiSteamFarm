@@ -145,6 +145,9 @@ public sealed class BotConfig {
 	public static readonly ImmutableList<uint> DefaultGamesPlayedWhileIdle = [];
 
 	[PublicAPI]
+	public const bool DefaultGamesPlayedWhileFarming = false;
+
+	[PublicAPI]
 	public const bool DefaultPromptForGamesPlayedWhileIdle = false;
 
 	[PublicAPI]
@@ -240,6 +243,9 @@ public sealed class BotConfig {
 	[SwaggerItemsMinMax(MinimumUint = 1, MaximumUint = uint.MaxValue)]
 	[UnconditionalSuppressMessage("AssemblyLoadTrimming", "IL2026:RequiresUnreferencedCode", Justification = "This is optional, supportive attribute, we don't care if it gets trimmed or not")]
 	public ImmutableList<uint> GamesPlayedWhileIdle { get; init; } = DefaultGamesPlayedWhileIdle;
+
+	[JsonInclude]
+	public bool GamesPlayedWhileFarming { get; init; } = DefaultGamesPlayedWhileFarming;
 
 	[JsonInclude]
 	public bool PromptForGamesPlayedWhileIdle { get; init; } = DefaultPromptForGamesPlayedWhileIdle;
@@ -425,6 +431,9 @@ public sealed class BotConfig {
 	public bool ShouldSerializeGamesPlayedWhileIdle() => !Saving || ((GamesPlayedWhileIdle != DefaultGamesPlayedWhileIdle) && !GamesPlayedWhileIdle.SequenceEqual(DefaultGamesPlayedWhileIdle));
 
 	[UsedImplicitly]
+	public bool ShouldSerializeGamesPlayedWhileFarming() => !Saving || (GamesPlayedWhileFarming != DefaultGamesPlayedWhileFarming);
+
+	[UsedImplicitly]
 	public bool ShouldSerializePromptForGamesPlayedWhileIdle() => !Saving || (PromptForGamesPlayedWhileIdle != DefaultPromptForGamesPlayedWhileIdle);
 
 	[UsedImplicitly]
@@ -563,8 +572,10 @@ public sealed class BotConfig {
 			return (false, Strings.FormatErrorConfigPropertyInvalid(nameof(GamesPlayedWhileIdle), 0));
 		}
 
-		if (GamesPlayedWhileIdle.Count > ArchiHandler.MaxGamesPlayedConcurrently) {
-			return (false, Strings.FormatErrorConfigPropertyInvalid(nameof(GamesPlayedWhileIdle), $"{nameof(GamesPlayedWhileIdle.Count)} {GamesPlayedWhileIdle.Count} > {ArchiHandler.MaxGamesPlayedConcurrently}"));
+		int maxGamesPlayedWhileIdle = ArchiHandler.MaxGamesPlayedConcurrently - (GamesPlayedWhileFarming ? 1 : 0);
+
+		if (GamesPlayedWhileIdle.Count > maxGamesPlayedWhileIdle) {
+			return (false, Strings.FormatErrorConfigPropertyInvalid(nameof(GamesPlayedWhileIdle), $"{nameof(GamesPlayedWhileIdle.Count)} {GamesPlayedWhileIdle.Count} > {maxGamesPlayedWhileIdle}"));
 		}
 
 		if ((GamingDeviceType == EGamingDeviceType.Unknown) || !Enum.IsDefined(GamingDeviceType)) {

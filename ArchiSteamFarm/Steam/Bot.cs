@@ -1460,7 +1460,15 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 			gameName = string.Format(CultureInfo.CurrentCulture, BotConfig.CustomGamePlayedWhileFarming, game.AppID, game.GameName);
 		}
 
-		await ArchiHandler.PlayGames(new HashSet<uint>(1) { game.PlayableAppID }, gameName).ConfigureAwait(false);
+		IReadOnlyCollection<uint> gameIDs = [game.PlayableAppID];
+
+		if (BotConfig.GamesPlayedWhileFarming) {
+			HashSet<uint> combinedGameIDs = [.. await GetGamesPlayedWhileIdle().ConfigureAwait(false)];
+			combinedGameIDs.Add(game.PlayableAppID);
+			gameIDs = combinedGameIDs;
+		}
+
+		await ArchiHandler.PlayGames(gameIDs, gameName).ConfigureAwait(false);
 	}
 
 	internal async Task IdleGames(IReadOnlyCollection<Game> games) {
@@ -1474,7 +1482,15 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 			gameName = string.Format(CultureInfo.CurrentCulture, BotConfig.CustomGamePlayedWhileFarming, string.Join(", ", games.Select(static game => game.AppID)), string.Join(", ", games.Select(static game => game.GameName)));
 		}
 
-		await ArchiHandler.PlayGames([.. games.Select(static game => game.PlayableAppID)], gameName).ConfigureAwait(false);
+		IReadOnlyCollection<uint> gameIDs = games.Select(static game => game.PlayableAppID).ToHashSet();
+
+		if (BotConfig.GamesPlayedWhileFarming) {
+			HashSet<uint> combinedGameIDs = [.. await GetGamesPlayedWhileIdle().ConfigureAwait(false)];
+			combinedGameIDs.UnionWith(gameIDs);
+			gameIDs = combinedGameIDs;
+		}
+
+		await ArchiHandler.PlayGames(gameIDs, gameName).ConfigureAwait(false);
 	}
 
 	internal async Task ImportKeysToRedeem(string filePath) {
@@ -3915,6 +3931,8 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 
 	internal bool IsFarmingAppIDAllowed(uint appID) => BotConfig.PromptForGamesPlayedWhileIdle ? (PromptedFarmingAppIDs?.Contains(appID) == true) : (BotConfig.FarmingAppIDs.IsEmpty || BotConfig.FarmingAppIDs.Contains(appID));
 
+	internal bool HasGamesPlayedWhileIdle => !BotConfig.GamesPlayedWhileIdle.IsEmpty || (BotConfig.PromptForGamesPlayedWhileIdle && (PromptedFarmingAppIDs?.Count > 0));
+
 	internal Task<ImmutableList<uint>> GetGamesPlayedWhileIdle() {
 		if (!BotConfig.PromptForGamesPlayedWhileIdle) {
 			return Task.FromResult(BotConfig.GamesPlayedWhileIdle);
@@ -3952,7 +3970,9 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 				}
 			}
 
-			if (invalidInput || (appIDs.Count > ArchiHandler.MaxGamesPlayedConcurrently)) {
+			int maxAppIDs = ArchiHandler.MaxGamesPlayedConcurrently - (BotConfig.GamesPlayedWhileFarming ? 1 : 0);
+
+			if (invalidInput || (appIDs.Count > maxAppIDs)) {
 				ArchiLogger.LogGenericWarning(Strings.FormatErrorIsInvalid(nameof(appIDs)));
 
 				continue;
